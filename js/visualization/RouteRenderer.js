@@ -18,8 +18,6 @@ export class RouteRenderer {
         this.currentZoom = zoomLevel;
         const displayRoutes = routes;
         
-        console.log(`Rendering ${displayRoutes.length} routes (zoom: ${zoomLevel.toFixed(2)}x)`);
-        
         // Calculate adaptive opacity
         const baseOpacity = this.calculateOpacity(displayRoutes.length);
         const zoomBonus = Math.min(0.15, zoomLevel * 0.03);
@@ -117,14 +115,33 @@ export class RouteRenderer {
         this.routesGroup.attr('transform', transform);
     }
     
-    updateOpacityByZoom(zoomLevel) {
-        const routeCount = this.routesGroup.selectAll('path').size();
+    updateOpacityByZoom(zoomLevel, selectedAirports = new Set()) {
+        // Skip if no routes are rendered
+        const paths = this.routesGroup.selectAll('path');
+        if (paths.empty()) return;
+        
+        const routeCount = paths.size();
         const baseOpacity = this.calculateOpacity(routeCount);
         const zoomBonus = Math.min(0.15, zoomLevel * 0.03);
-        const routeOpacity = baseOpacity + zoomBonus;
+        const finalOpacity = baseOpacity + zoomBonus;
         
-        this.routesGroup.selectAll('path')
-            .style('opacity', routeOpacity);
+        // Helper functions for highlighting
+        const isConnected = (d) => {
+            if (selectedAirports.size === 0) return true;
+            return selectedAirports.has(d.source) || selectedAirports.has(d.dest);
+        };
+        
+        const isBetweenSelected = (d) => {
+            if (selectedAirports.size < 2) return false;
+            return selectedAirports.has(d.source) && selectedAirports.has(d.dest);
+        };
+        
+        // Update opacity without transition, respecting selection
+        paths.style('opacity', d => {
+            if (selectedAirports.size === 0) return finalOpacity;
+            if (isBetweenSelected(d)) return Math.min(finalOpacity * 3, 1.0);
+            return isConnected(d) ? Math.min(finalOpacity * 2, 0.8) : finalOpacity * 0.15;
+        });
     }
 }
 
