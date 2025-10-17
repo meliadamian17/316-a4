@@ -18,6 +18,7 @@ export class AirlineRouteExplorer {
         this.snapshot = null;
         this.airlines = new Map();
         this.airports = new Map();
+        this.selectedAirport = null;  // For airport click highlight feature
         
         // State
         this.isUpdating = false;
@@ -54,6 +55,13 @@ export class AirlineRouteExplorer {
     
     initSVG() {
         this.svg = d3.select('#map-svg');
+        
+        // Click on background to clear airport selection
+        this.svg.on('click', () => {
+            if (this.selectedAirport) {
+                this.clearAirportSelection();
+            }
+        });
         
         // Initialize renderers
         this.mapRenderer = new MapRenderer(this.svg, this.projection, this.path);
@@ -190,6 +198,27 @@ export class AirlineRouteExplorer {
         }, CONFIG.ANIMATION.selectionDebounce);
     }
     
+    handleAirportClick(airportCode) {
+        // Toggle selection - if clicking same airport, deselect it
+        if (this.selectedAirport === airportCode) {
+            this.selectedAirport = null;
+        } else {
+            this.selectedAirport = airportCode;
+        }
+        
+        // Update visualization immediately
+        if (this.selectedAirlines.size > 0) {
+            this.updateVisualization();
+        }
+    }
+    
+    clearAirportSelection() {
+        this.selectedAirport = null;
+        if (this.selectedAirlines.size > 0) {
+            this.updateVisualization();
+        }
+    }
+    
     debouncedUpdate() {
         if (this.isUpdating) return;
         
@@ -217,7 +246,8 @@ export class AirlineRouteExplorer {
             airportDegrees, this.airports, zoomLevel, transform, this.projection, this.width, this.height
         );
         
-        this.routeRenderer.render(filteredRoutes, zoomLevel);
+        // Render routes with highlight information
+        this.routeRenderer.render(filteredRoutes, zoomLevel, this.selectedAirport);
         
         const tooltipCallbacks = {
             show: (event, d) => this.tooltipManager.show(event, d),
@@ -225,8 +255,11 @@ export class AirlineRouteExplorer {
             move: (event) => this.tooltipManager.move(event)
         };
         
-        this.airportRenderer.render(filteredAirports, this.airports, zoomLevel, tooltipCallbacks);
-        this.statsManager.updateStats(this.selectedAirlines.size, selectedRoutes);
+        // Add click callback for airport selection
+        const clickCallback = (airportCode) => this.handleAirportClick(airportCode);
+        
+        this.airportRenderer.render(filteredAirports, this.airports, zoomLevel, tooltipCallbacks, this.selectedAirport, clickCallback);
+        this.statsManager.updateStats(this.selectedAirlines.size, selectedRoutes, this.selectedAirport, this.airports.get(this.selectedAirport));
     }
     
     getSelectedRoutes() {

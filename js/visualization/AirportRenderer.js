@@ -18,7 +18,7 @@ export class AirportRenderer {
         this.airportsGroup = this.svg.append('g').attr('class', 'airports-layer');
     }
     
-    render(degrees, airports, zoomLevel, tooltipCallbacks) {
+    render(degrees, airports, zoomLevel, tooltipCallbacks, selectedAirport = null, clickCallback = null) {
         this.currentZoom = zoomLevel;
         
         const activeAirports = Array.from(degrees.entries()).map(([code, degree]) => ({
@@ -59,6 +59,14 @@ export class AirportRenderer {
                 .on('mousemove', tooltipCallbacks.move);
         }
         
+        // Click handler for airport selection
+        if (clickCallback) {
+            enter.on('click', function(event, d) {
+                event.stopPropagation();
+                clickCallback(d.code);
+            });
+        }
+        
         // Animate in
         const duration = Math.max(300, CONFIG.ANIMATION.nodeEnter - (zoomLevel * 30));
         enter.transition()
@@ -66,11 +74,30 @@ export class AirportRenderer {
             .attr('r', d => this.getRadius(d.degree))
             .style('opacity', 0.85);
         
-        // Update
-        circles.transition()
+        // Update - apply visual feedback for selected airport
+        const allCircles = enter.merge(circles);
+        
+        // Update click handler for existing circles
+        if (clickCallback) {
+            allCircles.on('click', function(event, d) {
+                event.stopPropagation();
+                clickCallback(d.code);
+            });
+        }
+        
+        // Apply selection styling
+        allCircles
+            .classed('selected-airport', d => d.code === selectedAirport)
+            .transition()
             .duration(300)
             .attr('r', d => this.getRadius(d.degree))
-            .attr('fill', d => this.colorUtils.getNodeColor(d.degree));
+            .attr('fill', d => this.colorUtils.getNodeColor(d.degree))
+            .attr('stroke-width', d => d.code === selectedAirport ? 3 : 1)
+            .attr('stroke', d => d.code === selectedAirport ? '#50e3c2' : 'var(--node-stroke)')
+            .style('opacity', d => {
+                if (!selectedAirport) return 0.85;
+                return d.code === selectedAirport ? 1 : 0.4;
+            });
     }
     
     getRadius(degree) {

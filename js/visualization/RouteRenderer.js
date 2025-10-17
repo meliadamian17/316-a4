@@ -14,7 +14,7 @@ export class RouteRenderer {
         this.routesGroup = this.svg.append('g').attr('class', 'routes-layer');
     }
     
-    render(routes, zoomLevel) {
+    render(routes, zoomLevel, selectedAirport = null) {
         this.currentZoom = zoomLevel;
         const displayRoutes = routes;
         
@@ -24,6 +24,18 @@ export class RouteRenderer {
         const baseOpacity = this.calculateOpacity(displayRoutes.length);
         const zoomBonus = Math.min(0.15, zoomLevel * 0.03);
         const finalOpacity = baseOpacity + zoomBonus;
+        
+        // Helper function to determine if route is connected to selected airport
+        const isConnected = (d) => {
+            if (!selectedAirport) return true;
+            return d.source === selectedAirport || d.dest === selectedAirport;
+        };
+        
+        // Helper function to get opacity based on selection
+        const getRouteOpacity = (d) => {
+            if (!selectedAirport) return finalOpacity;
+            return isConnected(d) ? Math.min(finalOpacity * 2, 0.8) : finalOpacity * 0.15;
+        };
         
         // Data join
         const paths = this.routesGroup
@@ -52,13 +64,13 @@ export class RouteRenderer {
         enter.transition()
             .delay((d, i) => Math.min(i * 0.5, maxDelay))
             .duration(duration)
-            .style('opacity', finalOpacity);
+            .style('opacity', d => getRouteOpacity(d));
         
-        // Update
+        // Update - apply highlighting based on selected airport
         paths.attr('stroke', d => this.colorUtils.getAirlineColor(d.airline))
             .transition()
             .duration(300)
-            .style('opacity', finalOpacity);
+            .style('opacity', d => getRouteOpacity(d));
     }
     
     calculateOpacity(routeCount) {
