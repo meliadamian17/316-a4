@@ -18,7 +18,7 @@ export class AirlineRouteExplorer {
         this.snapshot = null;
         this.airlines = new Map();
         this.airports = new Map();
-        this.selectedAirport = null;  // For airport click highlight feature
+        this.selectedAirports = new Set();  // For multi-airport selection
         
         // State
         this.isUpdating = false;
@@ -58,7 +58,7 @@ export class AirlineRouteExplorer {
         
         // Click on background to clear airport selection
         this.svg.on('click', () => {
-            if (this.selectedAirport) {
+            if (this.selectedAirports.size > 0) {
                 this.clearAirportSelection();
             }
         });
@@ -200,10 +200,10 @@ export class AirlineRouteExplorer {
     
     handleAirportClick(airportCode) {
         // Toggle selection - if clicking same airport, deselect it
-        if (this.selectedAirport === airportCode) {
-            this.selectedAirport = null;
+        if (this.selectedAirports.has(airportCode)) {
+            this.selectedAirports.delete(airportCode);
         } else {
-            this.selectedAirport = airportCode;
+            this.selectedAirports.add(airportCode);
         }
         
         // Update visualization immediately
@@ -213,7 +213,7 @@ export class AirlineRouteExplorer {
     }
     
     clearAirportSelection() {
-        this.selectedAirport = null;
+        this.selectedAirports.clear();
         if (this.selectedAirlines.size > 0) {
             this.updateVisualization();
         }
@@ -247,7 +247,7 @@ export class AirlineRouteExplorer {
         );
         
         // Render routes with highlight information
-        this.routeRenderer.render(filteredRoutes, zoomLevel, this.selectedAirport);
+        this.routeRenderer.render(filteredRoutes, zoomLevel, this.selectedAirports);
         
         const tooltipCallbacks = {
             show: (event, d) => this.tooltipManager.show(event, d),
@@ -258,8 +258,8 @@ export class AirlineRouteExplorer {
         // Add click callback for airport selection
         const clickCallback = (airportCode) => this.handleAirportClick(airportCode);
         
-        this.airportRenderer.render(filteredAirports, this.airports, zoomLevel, tooltipCallbacks, this.selectedAirport, clickCallback);
-        this.statsManager.updateStats(this.selectedAirlines.size, selectedRoutes, this.selectedAirport, this.airports.get(this.selectedAirport));
+        this.airportRenderer.render(filteredAirports, this.airports, zoomLevel, tooltipCallbacks, this.selectedAirports, clickCallback);
+        this.statsManager.updateStats(this.selectedAirlines.size, selectedRoutes, this.selectedAirports, this.airports);
     }
     
     getSelectedRoutes() {

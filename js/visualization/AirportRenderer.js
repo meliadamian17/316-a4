@@ -18,7 +18,7 @@ export class AirportRenderer {
         this.airportsGroup = this.svg.append('g').attr('class', 'airports-layer');
     }
     
-    render(degrees, airports, zoomLevel, tooltipCallbacks, selectedAirport = null, clickCallback = null) {
+    render(degrees, airports, zoomLevel, tooltipCallbacks, selectedAirports = new Set(), clickCallback = null) {
         this.currentZoom = zoomLevel;
         
         const activeAirports = Array.from(degrees.entries()).map(([code, degree]) => ({
@@ -87,16 +87,16 @@ export class AirportRenderer {
         
         // Apply selection styling
         allCircles
-            .classed('selected-airport', d => d.code === selectedAirport)
+            .classed('selected-airport', d => selectedAirports.has(d.code))
             .transition()
             .duration(300)
             .attr('r', d => this.getRadius(d.degree))
             .attr('fill', d => this.colorUtils.getNodeColor(d.degree))
-            .attr('stroke-width', d => d.code === selectedAirport ? 3 : 1)
-            .attr('stroke', d => d.code === selectedAirport ? '#50e3c2' : 'var(--node-stroke)')
+            .attr('stroke-width', d => selectedAirports.has(d.code) ? 3 : 1)
+            .attr('stroke', d => selectedAirports.has(d.code) ? '#50e3c2' : 'var(--node-stroke)')
             .style('opacity', d => {
-                if (!selectedAirport) return 0.85;
-                return d.code === selectedAirport ? 1 : 0.4;
+                if (selectedAirports.size === 0) return 0.85;
+                return selectedAirports.has(d.code) ? 1 : 0.4;
             });
     }
     

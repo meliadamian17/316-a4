@@ -14,7 +14,7 @@ export class RouteRenderer {
         this.routesGroup = this.svg.append('g').attr('class', 'routes-layer');
     }
     
-    render(routes, zoomLevel, selectedAirport = null) {
+    render(routes, zoomLevel, selectedAirports = new Set()) {
         this.currentZoom = zoomLevel;
         const displayRoutes = routes;
         
@@ -25,16 +25,30 @@ export class RouteRenderer {
         const zoomBonus = Math.min(0.15, zoomLevel * 0.03);
         const finalOpacity = baseOpacity + zoomBonus;
         
-        // Helper function to determine if route is connected to selected airport
+        // Helper function to determine if route is connected to selected airports
         const isConnected = (d) => {
-            if (!selectedAirport) return true;
-            return d.source === selectedAirport || d.dest === selectedAirport;
+            if (selectedAirports.size === 0) return true;
+            return selectedAirports.has(d.source) || selectedAirports.has(d.dest);
+        };
+        
+        // Helper function to determine if route is between selected airports
+        const isBetweenSelected = (d) => {
+            if (selectedAirports.size < 2) return false;
+            return selectedAirports.has(d.source) && selectedAirports.has(d.dest);
         };
         
         // Helper function to get opacity based on selection
         const getRouteOpacity = (d) => {
-            if (!selectedAirport) return finalOpacity;
+            if (selectedAirports.size === 0) return finalOpacity;
+            if (isBetweenSelected(d)) return Math.min(finalOpacity * 3, 1.0); // Highest opacity for routes between selected
             return isConnected(d) ? Math.min(finalOpacity * 2, 0.8) : finalOpacity * 0.15;
+        };
+        
+        // Helper function to get stroke width based on selection
+        const getRouteStrokeWidth = (d) => {
+            if (selectedAirports.size === 0) return 1;
+            if (isBetweenSelected(d)) return 2.5; // Thicker lines for routes between selected
+            return isConnected(d) ? 1.5 : 1;
         };
         
         // Data join
@@ -55,6 +69,7 @@ export class RouteRenderer {
             .attr('class', 'route-path')
             .attr('d', d => this.createArcPath(d))
             .attr('stroke', d => this.colorUtils.getAirlineColor(d.airline))
+            .attr('stroke-width', d => getRouteStrokeWidth(d))
             .style('opacity', 0);
         
         // Animate in
@@ -66,8 +81,9 @@ export class RouteRenderer {
             .duration(duration)
             .style('opacity', d => getRouteOpacity(d));
         
-        // Update - apply highlighting based on selected airport
+        // Update - apply highlighting based on selected airports
         paths.attr('stroke', d => this.colorUtils.getAirlineColor(d.airline))
+            .attr('stroke-width', d => getRouteStrokeWidth(d))
             .transition()
             .duration(300)
             .style('opacity', d => getRouteOpacity(d));
