@@ -1,8 +1,9 @@
 // Sidebar controls and airline list management
 export class SidebarManager {
-    constructor(dataLoader, onSelectionChange) {
+    constructor(dataLoader, onSelectionChange, onClearAll) {
         this.dataLoader = dataLoader;
         this.onSelectionChange = onSelectionChange;
+        this.onClearAll = onClearAll;
         this.airlines = new Map();
     }
     
@@ -66,6 +67,10 @@ export class SidebarManager {
         
         document.getElementById('clear-all-btn').addEventListener('click', () => {
             this.selectAllAirlines(false);
+            // Also clear selected airports when clearing all airlines
+            if (this.onClearAll) {
+                this.onClearAll();
+            }
         });
         
         // Top Airlines

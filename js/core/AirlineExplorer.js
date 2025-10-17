@@ -50,6 +50,7 @@ export class AirlineRouteExplorer {
         this.initManagers();
         this.setupWorkerCallbacks();
         this.setupWindowResize();
+        this.setupKeyboardShortcuts();
         this.loadData();
     }
     
@@ -83,7 +84,8 @@ export class AirlineRouteExplorer {
         // Sidebar
         this.sidebarManager = new SidebarManager(
             this.dataLoader,
-            (airline, selected) => this.queueAirlineToggle(airline, selected)
+            (airline, selected) => this.queueAirlineToggle(airline, selected),
+            () => this.clearAirportSelection() // Callback to clear airports when clearing all
         );
         this.sidebarManager.init();
         
@@ -118,11 +120,21 @@ export class AirlineRouteExplorer {
         });
     }
     
+    
     setupWindowResize() {
         let resizeTimer;
         window.addEventListener('resize', () => {
             clearTimeout(resizeTimer);
             resizeTimer = setTimeout(() => this.handleResize(), 250);
+        });
+    }
+    
+    setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (event) => {
+            // ESC key to clear airport selection
+            if (event.key === 'Escape' && this.selectedAirports.size > 0) {
+                this.clearAirportSelection();
+            }
         });
     }
     
@@ -190,6 +202,8 @@ export class AirlineRouteExplorer {
             this.selectedAirlines.add(airline);
         } else {
             this.selectedAirlines.delete(airline);
+            // Clear airports that are only connected by the deselected airline
+            this.clearAirportsOnlyConnectedByAirline(airline);
         }
         
         clearTimeout(this.debounceTimer);
@@ -217,6 +231,82 @@ export class AirlineRouteExplorer {
         if (this.selectedAirlines.size > 0) {
             this.updateVisualization();
         }
+    }
+    
+    clearAirportsOnlyConnectedByAirline(deselectedAirline) {
+        if (this.selectedAirports.size === 0) return;
+        
+        // Get all routes from currently selected airlines
+        const currentRoutes = this.getSelectedRoutes();
+        
+        // Find airports that are only connected by the deselected airline
+        const airportsToRemove = new Set();
+        
+        this.selectedAirports.forEach(airportCode => {
+            // Check if this airport is connected by any remaining selected airlines
+            const isConnectedByOtherAirlines = currentRoutes.some(route => 
+                (route.source === airportCode || route.dest === airportCode) && 
+                route.airline !== deselectedAirline
+            );
+            
+            // If not connected by other airlines, mark for removal
+            if (!isConnectedByOtherAirlines) {
+                airportsToRemove.add(airportCode);
+            }
+        });
+        
+        // Remove airports that are only connected by the deselected airline
+        if (airportsToRemove.size > 0) {
+            airportsToRemove.forEach(airportCode => {
+                this.selectedAirports.delete(airportCode);
+            });
+            
+            console.log(`Cleared ${airportsToRemove.size} airports that were only connected by ${deselectedAirline}`);
+            
+            // Show brief notification
+            this.showAirportClearNotification(airportsToRemove.size, deselectedAirline);
+        }
+    }
+    
+    showAirportClearNotification(count, airline) {
+        // Create a temporary notification
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--accent-pink);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        `;
+        notification.textContent = `Cleared ${count} airport${count > 1 ? 's' : ''} (only connected by ${airline})`;
+        
+        document.body.appendChild(notification);
+        
+        // Animate in
+        requestAnimationFrame(() => {
+            notification.style.opacity = '1';
+            notification.style.transform = 'translateX(0)';
+        });
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }, 3000);
     }
     
     debouncedUpdate() {

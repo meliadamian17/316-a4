@@ -11,6 +11,14 @@ export class StatsManager {
         document.getElementById('stat-routes').textContent = routes.length.toLocaleString();
         document.getElementById('stat-airports').textContent = airports.size;
         
+        // Update selected airports count in main stats
+        const selectedAirportsCountEl = document.getElementById('stat-selected-airports');
+        const selectedAirportsCountContainer = document.getElementById('selected-airports-count');
+        if (selectedAirportsCountEl && selectedAirportsCountContainer) {
+            selectedAirportsCountEl.textContent = selectedAirports.size;
+            selectedAirportsCountContainer.style.display = selectedAirports.size > 0 ? 'flex' : 'none';
+        }
+        
         // Update selected airports display
         const selectedAirportEl = document.getElementById('selected-airport-info');
         if (selectedAirportEl) {
