@@ -36,7 +36,7 @@ export const CONFIG = {
         nodeEnter: 500,
         nodeExit: 300,
         themeTransition: 300,
-        zoomDebounce: 150,
+        zoomDebounce: 200,
         selectionDebounce: 100
     },
     

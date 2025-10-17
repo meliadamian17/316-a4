@@ -92,7 +92,8 @@ export class AirlineRouteExplorer {
         // Zoom
         this.zoomManager = new ZoomManager(
             this.svg,
-            (transform, zoomLevel) => this.handleZoomChange(transform, zoomLevel)
+            (transform, zoomLevel) => this.handleZoomChange(transform, zoomLevel),
+            (transform, zoomLevel) => this.handleZoomEnd(transform, zoomLevel)
         );
         this.zoomManager.init();
         
@@ -362,15 +363,27 @@ export class AirlineRouteExplorer {
         return routes;
     }
     
-    handleZoomChange(transform, zoomLevel) {
+    handleZoomChange(transform, zoomLevel, isActivelyZooming) {
+        // Apply transforms immediately for smooth panning/zooming
         this.mapRenderer.updateTransform(transform);
         this.snapshotGroup.attr('transform', transform);
         this.routeRenderer.updateTransform(transform);
         this.airportRenderer.updateTransform(transform);
         
-        this.routeRenderer.updateOpacityByZoom(zoomLevel);
+        // Skip expensive visual property updates during active zoom for better performance
+        // They will be updated when zoom ends
+        if (!isActivelyZooming) {
+            this.routeRenderer.updateOpacityByZoom(zoomLevel, this.selectedAirports);
+            this.airportRenderer.updateRadiusByZoom(zoomLevel);
+        }
+    }
+    
+    handleZoomEnd(transform, zoomLevel) {
+        // Update visual properties now that zoom has ended
+        this.routeRenderer.updateOpacityByZoom(zoomLevel, this.selectedAirports);
         this.airportRenderer.updateRadiusByZoom(zoomLevel);
         
+        // Recalculate and re-render after zoom/pan ends (debounced)
         if (this.selectedAirlines.size > 0) {
             this.updateVisualization();
         }

@@ -27,8 +27,6 @@ export class AirportRenderer {
             ...airports.get(code)
         })).filter(d => d.lat !== undefined && d.lon !== undefined);
         
-        console.log(`Rendering ${activeAirports.length} airports (zoom: ${zoomLevel.toFixed(2)}x)`);
-        
         // Data join
         const circles = this.airportsGroup
             .selectAll('circle.airport-node')
@@ -111,8 +109,13 @@ export class AirportRenderer {
     
     updateRadiusByZoom(zoomLevel) {
         this.currentZoom = zoomLevel;
-        this.airportsGroup.selectAll('circle')
-            .attr('r', d => this.getRadius(d.degree));
+        
+        // Skip if no circles are rendered
+        const circles = this.airportsGroup.selectAll('circle');
+        if (circles.empty()) return;
+        
+        // Update radius without transition for smooth interaction
+        circles.attr('r', d => this.getRadius(d.degree));
     }
 }
 
