@@ -296,6 +296,32 @@
                         </button>
                     </div>
                 </div>
+                
+                <!-- Export Controls -->
+                <div class="mt-3 pt-3" style="border-top: 1px solid var(--border-color);">
+                    <h3 class="text-sm font-semibold mb-2" style="color: var(--text-primary);">Export Data</h3>
+                    <div class="flex gap-2">
+                        <button 
+                            id="export-csv-btn"
+                            class="flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all"
+                            style="background: var(--accent-cyan); color: var(--bg-primary); border: none;"
+                            onmouseover="this.style.opacity='0.9'"
+                            onmouseout="this.style.opacity='1'"
+                        >
+                            Export CSV
+                        </button>
+                        <button 
+                            id="export-json-btn"
+                            class="flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all"
+                            style="background: var(--accent-blue); color: white; border: none;"
+                            onmouseover="this.style.opacity='0.9'"
+                            onmouseout="this.style.opacity='1'"
+                        >
+                            Export JSON
+                        </button>
+                    </div>
+                    <p class="text-xs mt-2" style="color: var(--text-tertiary);">Downloads selected routes and airports</p>
+                </div>
             </div>
         </div>
         

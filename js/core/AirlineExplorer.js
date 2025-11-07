@@ -11,6 +11,7 @@ import { AirportRenderer } from '../visualization/AirportRenderer.js';
 import { SidebarManager } from '../ui/SidebarManager.js';
 import { TooltipManager } from '../ui/TooltipManager.js';
 import { StatsManager } from '../ui/StatsManager.js';
+import { ExportManager } from '../utils/ExportManager.js';
 
 export class AirlineRouteExplorer {
     constructor() {
@@ -41,6 +42,7 @@ export class AirlineRouteExplorer {
         this.workerManager = new WorkerManager();
         this.colorUtils = new ColorUtils();
         this.statsManager = new StatsManager();
+        this.exportManager = new ExportManager();
         
         this.init();
     }
@@ -99,6 +101,9 @@ export class AirlineRouteExplorer {
         
         // Snapshot controls
         this.setupSnapshotControls();
+        
+        // Export controls
+        this.setupExportControls();
     }
     
     setupWorkerCallbacks() {
@@ -118,6 +123,16 @@ export class AirlineRouteExplorer {
         
         document.getElementById('clear-snapshot-btn').addEventListener('click', () => {
             this.clearSnapshot();
+        });
+    }
+    
+    setupExportControls() {
+        document.getElementById('export-csv-btn').addEventListener('click', () => {
+            this.exportSelectedData('csv');
+        });
+        
+        document.getElementById('export-json-btn').addEventListener('click', () => {
+            this.exportSelectedData('json');
         });
     }
     
@@ -453,6 +468,75 @@ export class AirlineRouteExplorer {
         }
         if (this.snapshot) {
             this.renderSnapshot();
+        }
+    }
+    
+    exportSelectedData(format) {
+        if (this.selectedAirlines.size === 0) {
+            this.exportManager.showNotification('Please select at least one airline to export', 'error');
+            return;
+        }
+        
+        const selectedRoutes = this.getSelectedRoutes();
+        const airportDegrees = this.dataProcessor.calculateAirportDegrees(selectedRoutes);
+        
+        // Format routes data
+        const routesData = selectedRoutes.map(route => ({
+            airline: route.airline,
+            source_airport: route.source,
+            destination_airport: route.dest,
+            source_latitude: route.sourceCoords.lat,
+            source_longitude: route.sourceCoords.lon,
+            destination_latitude: route.destCoords.lat,
+            destination_longitude: route.destCoords.lon
+        }));
+        
+        // Format airports data
+        const airportsData = Array.from(airportDegrees.entries()).map(([code, degree]) => {
+            const airport = this.airports.get(code);
+            return {
+                airport_code: code,
+                latitude: airport ? airport.lat : null,
+                longitude: airport ? airport.lon : null,
+                connection_degree: degree,
+                is_selected: this.selectedAirports.has(code)
+            };
+        });
+        
+        // Format airlines data
+        const airlinesData = Array.from(this.selectedAirlines).map(airline => {
+            const routes = this.airlines.get(airline) || [];
+            return {
+                airline_code: airline,
+                airline_name: this.dataLoader.getAirlineName(airline),
+                route_count: routes.length
+            };
+        });
+        
+        // Create export data structure
+        const exportData = {
+            metadata: {
+                export_date: new Date().toISOString(),
+                selected_airlines_count: this.selectedAirlines.size,
+                selected_airports_count: this.selectedAirports.size,
+                total_routes: selectedRoutes.length,
+                total_airports: airportsData.length
+            },
+            airlines: airlinesData,
+            airports: airportsData,
+            routes: routesData
+        };
+        
+        // Generate filename with timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        const filename = `airline_export_${timestamp}`;
+        
+        if (format === 'csv') {
+            // Export routes as CSV (most common use case)
+            this.exportManager.exportToCSV(routesData, `${filename}_routes`);
+        } else if (format === 'json') {
+            // Export all data as JSON
+            this.exportManager.exportToJSON(exportData, filename);
         }
     }
 }
