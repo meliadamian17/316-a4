@@ -1,9 +1,10 @@
 // Sidebar controls and airline list management
 export class SidebarManager {
-    constructor(dataLoader, onSelectionChange, onClearAll) {
+    constructor(dataLoader, onSelectionChange, onClearAll, onChartClick) {
         this.dataLoader = dataLoader;
         this.onSelectionChange = onSelectionChange;
         this.onClearAll = onClearAll;
+        this.onChartClick = onChartClick;
         this.airlines = new Map();
     }
     
@@ -40,12 +41,57 @@ export class SidebarManager {
                         ${showCode ? `<span class="font-mono">${this.escapeHtml(airline)}</span> · ` : ''}${routes.length.toLocaleString()} routes
                     </div>
                 </label>
+                <button 
+                    class="chart-icon-btn"
+                    data-airline="${this.escapeHtml(airline)}"
+                    title="View route distribution chart"
+                    style="
+                        background: var(--bg-tertiary);
+                        border: 1px solid var(--border-color);
+                        border-radius: 4px;
+                        width: 28px;
+                        height: 28px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                        flex-shrink: 0;
+                    "
+                >
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color: var(--text-secondary);">
+                        <rect x="2" y="10" width="3" height="4"/>
+                        <rect x="6.5" y="6" width="3" height="8"/>
+                        <rect x="11" y="2" width="3" height="12"/>
+                    </svg>
+                </button>
             `;
             
             const checkbox = div.querySelector('input');
             checkbox.addEventListener('change', (e) => {
                 this.onSelectionChange(airline, e.target.checked);
                 div.classList.toggle('checked', e.target.checked);
+            });
+            
+            // Chart icon button
+            const chartBtn = div.querySelector('.chart-icon-btn');
+            chartBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent checkbox toggle
+                if (this.onChartClick) {
+                    this.onChartClick(airline, displayName);
+                }
+            });
+            
+            // Hover effects for chart button
+            chartBtn.addEventListener('mouseenter', () => {
+                chartBtn.style.background = 'var(--accent-blue)';
+                chartBtn.style.borderColor = 'var(--accent-blue)';
+                chartBtn.querySelector('svg').style.color = 'white';
+            });
+            chartBtn.addEventListener('mouseleave', () => {
+                chartBtn.style.background = 'var(--bg-tertiary)';
+                chartBtn.style.borderColor = 'var(--border-color)';
+                chartBtn.querySelector('svg').style.color = 'var(--text-secondary)';
             });
             
             fragment.appendChild(div);

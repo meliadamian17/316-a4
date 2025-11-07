@@ -8,6 +8,8 @@ import { ZoomManager } from '../utils/ZoomManager.js';
 import { MapRenderer } from '../visualization/MapRenderer.js';
 import { RouteRenderer } from '../visualization/RouteRenderer.js';
 import { AirportRenderer } from '../visualization/AirportRenderer.js';
+import { ChartModal } from '../visualization/ChartModal.js';
+import { BarChartRenderer } from '../visualization/BarChartRenderer.js';
 import { SidebarManager } from '../ui/SidebarManager.js';
 import { TooltipManager } from '../ui/TooltipManager.js';
 import { StatsManager } from '../ui/StatsManager.js';
@@ -54,6 +56,8 @@ export class AirlineRouteExplorer {
         this.colorUtils = new ColorUtils();
         this.statsManager = new StatsManager();
         this.exportManager = new ExportManager();
+        this.chartModal = new ChartModal();
+        this.barChartRenderer = new BarChartRenderer(this.colorUtils);
         
         this.init();
     }
@@ -98,7 +102,8 @@ export class AirlineRouteExplorer {
         this.sidebarManager = new SidebarManager(
             this.dataLoader,
             (airline, selected) => this.queueAirlineToggle(airline, selected),
-            () => this.clearAirportSelection() // Callback to clear airports when clearing all
+            () => this.clearAirportSelection(), // Callback to clear airports when clearing all
+            (airline, displayName) => this.showAirlineChart(airline, displayName) // Callback for chart icon click
         );
         this.sidebarManager.init();
         
@@ -620,6 +625,46 @@ export class AirlineRouteExplorer {
             // Export all data as JSON
             this.exportManager.exportToJSON(exportData, filename);
         }
+    }
+    
+    showAirlineChart(airlineCode, displayName) {
+        // Get routes for this airline
+        const airlineRoutes = this.airlines.get(airlineCode);
+        
+        if (!airlineRoutes || airlineRoutes.length === 0) {
+            console.warn(`No routes found for airline: ${airlineCode}`);
+            return;
+        }
+        
+        // Aggregate stats
+        const stats = this.dataProcessor.aggregateAirlineStats(airlineRoutes, this.airports);
+        
+        // Open modal with title
+        const title = `${displayName} Route Distribution`;
+        const subtitle = `${stats.summary.totalRoutes.toLocaleString()} routes · ${stats.summary.uniqueAirports} airports`;
+        this.chartModal.open(title, subtitle);
+        
+        // Get chart container
+        const container = this.chartModal.getChartContainer();
+        
+        // Render chart
+        this.barChartRenderer.render(container, stats.airportStats, 'count');
+        
+        // Setup sort buttons
+        const { countBtn, nameBtn } = this.chartModal.getSortButtons();
+        
+        countBtn.onclick = () => {
+            this.chartModal.setActiveSortButton('count');
+            this.barChartRenderer.update(container, 'count');
+        };
+        
+        nameBtn.onclick = () => {
+            this.chartModal.setActiveSortButton('name');
+            this.barChartRenderer.update(container, 'name');
+        };
+        
+        // Set initial active button
+        this.chartModal.setActiveSortButton('count');
     }
 }
 

@@ -156,5 +156,66 @@ export class DataProcessor {
         const shuffled = routes.sort(() => 0.5 - Math.random());
         return shuffled.slice(0, count);
     }
+    
+    aggregateAirlineStats(airlineRoutes, airports) {
+        // Count routes by destination airport
+        const destinationCounts = new Map();
+        const sourceCounts = new Map();
+        
+        airlineRoutes.forEach(route => {
+            // Count destinations
+            destinationCounts.set(
+                route.dest, 
+                (destinationCounts.get(route.dest) || 0) + 1
+            );
+            
+            // Count sources
+            sourceCounts.set(
+                route.source,
+                (sourceCounts.get(route.source) || 0) + 1
+            );
+        });
+        
+        // Combine to get total routes per airport
+        const airportRouteCounts = new Map();
+        
+        destinationCounts.forEach((count, airport) => {
+            airportRouteCounts.set(airport, (airportRouteCounts.get(airport) || 0) + count);
+        });
+        
+        sourceCounts.forEach((count, airport) => {
+            airportRouteCounts.set(airport, (airportRouteCounts.get(airport) || 0) + count);
+        });
+        
+        // Convert to array with airport details
+        const airportStats = Array.from(airportRouteCounts.entries()).map(([code, count]) => {
+            const airport = airports.get(code);
+            return {
+                airport: code,
+                airportName: airport ? airport.name : code,
+                count: count,
+                latitude: airport ? airport.lat : null,
+                longitude: airport ? airport.lon : null
+            };
+        });
+        
+        // Calculate summary stats
+        const uniqueDestinations = new Set(airlineRoutes.map(r => r.dest)).size;
+        const uniqueSources = new Set(airlineRoutes.map(r => r.source)).size;
+        const uniqueAirports = new Set([
+            ...airlineRoutes.map(r => r.dest),
+            ...airlineRoutes.map(r => r.source)
+        ]).size;
+        
+        return {
+            airportStats: airportStats,
+            summary: {
+                totalRoutes: airlineRoutes.length,
+                uniqueDestinations: uniqueDestinations,
+                uniqueSources: uniqueSources,
+                uniqueAirports: uniqueAirports
+            }
+        };
+    }
 }
 
