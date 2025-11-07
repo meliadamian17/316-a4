@@ -146,7 +146,7 @@ export class BarChartRenderer {
             .attr('x', 5) // Start at 5 for animation
             .attr('y', d => yScale(d.airport) + yScale.bandwidth() / 2)
             .attr('dy', '0.35em')
-            .style('fill', 'white')
+            .style('fill', 'var(--text-primary)')
             .style('font-size', '11px')
             .style('font-weight', '600')
             .style('opacity', 0)
@@ -156,7 +156,7 @@ export class BarChartRenderer {
         labels.transition()
             .duration(600)
             .delay((d, i) => i * 30 + 300)
-            .attr('x', d => Math.min(xScale(d.count) - 5, width - 40))
+            .attr('x', d => xScale(d.count) + 8)
             .style('opacity', 1);
         
         // Add interactivity

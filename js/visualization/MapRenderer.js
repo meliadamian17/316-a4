@@ -24,8 +24,8 @@ export class MapRenderer {
                 .enter()
                 .append('path')
                 .attr('d', this.path)
-                .attr('fill', '#0f0f0f')
-                .attr('stroke', '#1a1a1a')
+                .attr('fill', '#2d2d2d')
+                .attr('stroke', '#404040')
                 .attr('stroke-width', 0.5);
         } catch (err) {
             console.error('Error loading map:', err);
