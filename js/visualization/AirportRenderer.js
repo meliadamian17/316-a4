@@ -18,7 +18,7 @@ export class AirportRenderer {
         this.airportsGroup = this.svg.append('g').attr('class', 'airports-layer');
     }
     
-    render(degrees, airports, zoomLevel, tooltipCallbacks, selectedAirports = new Set(), clickCallback = null) {
+    render(degrees, airports, zoomLevel, tooltipCallbacks, selectedAirports = new Set(), clickCallback = null, isZoomRender = false) {
         this.currentZoom = zoomLevel;
         
         const activeAirports = Array.from(degrees.entries()).map(([code, degree]) => ({
@@ -33,12 +33,18 @@ export class AirportRenderer {
             .data(activeAirports, d => d.code);
         
         // Exit
-        circles.exit()
-            .transition()
-            .duration(CONFIG.ANIMATION.nodeExit)
-            .attr('r', 0)
-            .style('opacity', 0)
-            .remove();
+        const exitTransition = circles.exit();
+        if (isZoomRender) {
+            // Skip animations during zoom for instant response
+            exitTransition.remove();
+        } else {
+            exitTransition
+                .transition()
+                .duration(CONFIG.ANIMATION.nodeExit)
+                .attr('r', 0)
+                .style('opacity', 0)
+                .remove();
+        }
         
         // Enter
         const enter = circles.enter()
@@ -66,11 +72,18 @@ export class AirportRenderer {
         }
         
         // Animate in
-        const duration = Math.max(300, CONFIG.ANIMATION.nodeEnter - (zoomLevel * 30));
-        enter.transition()
-            .duration(duration)
-            .attr('r', d => this.getRadius(d.degree))
-            .style('opacity', 0.85);
+        if (isZoomRender) {
+            // Skip animations during zoom - instantly show airports
+            enter
+                .attr('r', d => this.getRadius(d.degree))
+                .style('opacity', 0.85);
+        } else {
+            const duration = Math.max(300, CONFIG.ANIMATION.nodeEnter - (zoomLevel * 30));
+            enter.transition()
+                .duration(duration)
+                .attr('r', d => this.getRadius(d.degree))
+                .style('opacity', 0.85);
+        }
         
         // Update - apply visual feedback for selected airport
         const allCircles = enter.merge(circles);
@@ -83,19 +96,37 @@ export class AirportRenderer {
             });
         }
         
+        // Pre-calculate selection checks once per airport (optimization)
+        const getOpacity = (d) => {
+            if (selectedAirports.size === 0) return 0.85;
+            return selectedAirports.has(d.code) ? 1 : 0.4;
+        };
+        
+        const getStrokeWidth = (d) => selectedAirports.has(d.code) ? 3 : 1;
+        const getStroke = (d) => selectedAirports.has(d.code) ? '#50e3c2' : 'var(--node-stroke)';
+        
         // Apply selection styling
-        allCircles
-            .classed('selected-airport', d => selectedAirports.has(d.code))
-            .transition()
-            .duration(300)
-            .attr('r', d => this.getRadius(d.degree))
-            .attr('fill', d => this.colorUtils.getNodeColor(d.degree))
-            .attr('stroke-width', d => selectedAirports.has(d.code) ? 3 : 1)
-            .attr('stroke', d => selectedAirports.has(d.code) ? '#50e3c2' : 'var(--node-stroke)')
-            .style('opacity', d => {
-                if (selectedAirports.size === 0) return 0.85;
-                return selectedAirports.has(d.code) ? 1 : 0.4;
-            });
+        const updateSelection = allCircles
+            .classed('selected-airport', d => selectedAirports.has(d.code));
+        
+        if (isZoomRender) {
+            // Instant updates during zoom
+            updateSelection
+                .attr('r', d => this.getRadius(d.degree))
+                .attr('fill', d => this.colorUtils.getNodeColor(d.degree))
+                .attr('stroke-width', getStrokeWidth)
+                .attr('stroke', getStroke)
+                .style('opacity', getOpacity);
+        } else {
+            updateSelection
+                .transition()
+                .duration(300)
+                .attr('r', d => this.getRadius(d.degree))
+                .attr('fill', d => this.colorUtils.getNodeColor(d.degree))
+                .attr('stroke-width', getStrokeWidth)
+                .attr('stroke', getStroke)
+                .style('opacity', getOpacity);
+        }
     }
     
     getRadius(degree) {

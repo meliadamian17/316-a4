@@ -11,6 +11,10 @@ export class ZoomManager {
         this.zoomTimer = null;
         this.isActivelyZooming = false;
         
+        // RAF throttling for zoom events
+        this.rafPending = false;
+        this.lastZoomEvent = null;
+        
         this.zoomBehavior = d3.zoom()
             .scaleExtent(CONFIG.ZOOM_EXTENT)
             .on('zoom', (event) => this.handleZoom(event))
@@ -25,13 +29,25 @@ export class ZoomManager {
         this.currentZoom = event.transform.k;
         this.currentTransform = event.transform;
         this.isActivelyZooming = true;
+        this.lastZoomEvent = event;
         
-        // Apply transforms immediately for smooth interaction
-        if (this.onZoomChange) {
-            this.onZoomChange(event.transform, this.currentZoom, this.isActivelyZooming);
+        // Throttle zoom updates using RAF for smooth updates
+        if (!this.rafPending) {
+            this.rafPending = true;
+            requestAnimationFrame(() => {
+                this.rafPending = false;
+                
+                if (this.onZoomChange && this.lastZoomEvent) {
+                    this.onZoomChange(
+                        this.lastZoomEvent.transform, 
+                        this.lastZoomEvent.transform.k, 
+                        this.isActivelyZooming
+                    );
+                }
+            });
         }
         
-        // Debounce expensive recalculations
+        // Debounce expensive recalculations with longer delay
         clearTimeout(this.zoomTimer);
         this.zoomTimer = setTimeout(() => {
             this.isActivelyZooming = false;
@@ -42,11 +58,13 @@ export class ZoomManager {
     }
     
     handleZoomEnd(event) {
-        // Also trigger on zoom end for immediate feedback when user stops
-        clearTimeout(this.zoomTimer);
-        this.isActivelyZooming = false;
-        if (this.onZoomEnd) {
-            this.onZoomEnd(event.transform, event.transform.k);
+        // Only trigger if we're still actively zooming (prevent duplicate calls)
+        if (this.isActivelyZooming) {
+            clearTimeout(this.zoomTimer);
+            this.isActivelyZooming = false;
+            if (this.onZoomEnd) {
+                this.onZoomEnd(event.transform, event.transform.k);
+            }
         }
     }
     

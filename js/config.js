@@ -36,8 +36,9 @@ export const CONFIG = {
         nodeEnter: 500,
         nodeExit: 300,
         themeTransition: 300,
-        zoomDebounce: 200,
-        selectionDebounce: 100
+        zoomDebounce: 400,        // Increased from 200ms for better performance
+        selectionDebounce: 100,
+        updateThrottle: 16        // ~60fps throttle for continuous updates
     },
     
     // Vercel color palette

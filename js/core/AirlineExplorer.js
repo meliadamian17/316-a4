@@ -25,6 +25,17 @@ export class AirlineRouteExplorer {
         this.isUpdating = false;
         this.debounceTimer = null;
         
+        // Performance caching
+        this.cache = {
+            selectedRoutes: null,
+            airportDegrees: null,
+            filteredRoutes: null,
+            filteredAirports: null,
+            lastZoomLevel: null,
+            lastTransform: null,
+            lastSelectionState: null
+        };
+        
         // Dimensions
         this.width = window.innerWidth - CONFIG.SIDEBAR_WIDTH;
         this.height = window.innerHeight - CONFIG.HEADER_HEIGHT;
@@ -236,6 +247,9 @@ export class AirlineRouteExplorer {
             this.selectedAirports.add(airportCode);
         }
         
+        // Invalidate cache when selection changes
+        this.invalidateCache();
+        
         // Update visualization immediately
         if (this.selectedAirlines.size > 0) {
             this.updateVisualization();
@@ -244,9 +258,18 @@ export class AirlineRouteExplorer {
     
     clearAirportSelection() {
         this.selectedAirports.clear();
+        this.invalidateCache();
         if (this.selectedAirlines.size > 0) {
             this.updateVisualization();
         }
+    }
+    
+    invalidateCache() {
+        this.cache.selectedRoutes = null;
+        this.cache.airportDegrees = null;
+        this.cache.filteredRoutes = null;
+        this.cache.filteredAirports = null;
+        this.cache.lastSelectionState = null;
     }
     
     clearAirportsOnlyConnectedByAirline(deselectedAirline) {
@@ -331,29 +354,74 @@ export class AirlineRouteExplorer {
         this.isUpdating = true;
         this.statsManager.showLoadingBar();
         
+        // Invalidate cache when airlines change
+        this.invalidateCache();
+        
         requestAnimationFrame(() => {
             this.updateVisualization();
             this.isUpdating = false;
         });
     }
     
-    updateVisualization() {
-        const selectedRoutes = this.getSelectedRoutes();
-        const airportDegrees = this.dataProcessor.calculateAirportDegrees(selectedRoutes);
-        
+    updateVisualization(forceRecalculate = false, isZoomRender = false) {
         const zoomLevel = this.zoomManager.getZoomLevel();
         const transform = this.zoomManager.getTransform();
         
-        const filteredRoutes = this.dataProcessor.filterRoutesByZoom(
-            selectedRoutes, zoomLevel, transform, this.projection, this.width, this.height
-        );
+        // Check if we can use cached data
+        const selectionChanged = this.hasSelectionChanged();
+        const zoomChanged = this.cache.lastZoomLevel !== zoomLevel || 
+                           !this.transformsEqual(this.cache.lastTransform, transform);
         
-        const filteredAirports = this.dataProcessor.filterAirportsByZoom(
-            airportDegrees, this.airports, zoomLevel, transform, this.projection, this.width, this.height
-        );
+        const shouldRecalculate = forceRecalculate || selectionChanged || 
+                                 this.cache.selectedRoutes === null;
         
-        // Render routes with highlight information
-        this.routeRenderer.render(filteredRoutes, zoomLevel, this.selectedAirports);
+        // Get or calculate selected routes
+        let selectedRoutes;
+        if (shouldRecalculate) {
+            selectedRoutes = this.getSelectedRoutes();
+            this.cache.selectedRoutes = selectedRoutes;
+        } else {
+            selectedRoutes = this.cache.selectedRoutes;
+        }
+        
+        // Get or calculate airport degrees
+        let airportDegrees;
+        if (shouldRecalculate) {
+            airportDegrees = this.dataProcessor.calculateAirportDegrees(selectedRoutes);
+            this.cache.airportDegrees = airportDegrees;
+        } else {
+            airportDegrees = this.cache.airportDegrees;
+        }
+        
+        // Filter routes by zoom (recalculate if zoom/transform changed or cache is empty)
+        let filteredRoutes;
+        if (shouldRecalculate || zoomChanged || this.cache.filteredRoutes === null) {
+            filteredRoutes = this.dataProcessor.filterRoutesByZoom(
+                selectedRoutes, zoomLevel, transform, this.projection, this.width, this.height
+            );
+            this.cache.filteredRoutes = filteredRoutes;
+        } else {
+            filteredRoutes = this.cache.filteredRoutes;
+        }
+        
+        // Filter airports by zoom
+        let filteredAirports;
+        if (shouldRecalculate || zoomChanged || this.cache.filteredAirports === null) {
+            filteredAirports = this.dataProcessor.filterAirportsByZoom(
+                airportDegrees, this.airports, zoomLevel, transform, this.projection, this.width, this.height
+            );
+            this.cache.filteredAirports = filteredAirports;
+        } else {
+            filteredAirports = this.cache.filteredAirports;
+        }
+        
+        // Update cache state
+        this.cache.lastZoomLevel = zoomLevel;
+        this.cache.lastTransform = { k: transform.k, x: transform.x, y: transform.y };
+        this.updateSelectionState();
+        
+        // Render routes with highlight information (skip animations during zoom for performance)
+        this.routeRenderer.render(filteredRoutes, zoomLevel, this.selectedAirports, isZoomRender);
         
         const tooltipCallbacks = {
             show: (event, d) => this.tooltipManager.show(event, d),
@@ -361,11 +429,30 @@ export class AirlineRouteExplorer {
             move: (event) => this.tooltipManager.move(event)
         };
         
-        // Add click callback for airport selection
         const clickCallback = (airportCode) => this.handleAirportClick(airportCode);
         
-        this.airportRenderer.render(filteredAirports, this.airports, zoomLevel, tooltipCallbacks, this.selectedAirports, clickCallback);
+        this.airportRenderer.render(filteredAirports, this.airports, zoomLevel, tooltipCallbacks, this.selectedAirports, clickCallback, isZoomRender);
         this.statsManager.updateStats(this.selectedAirlines.size, selectedRoutes, this.selectedAirports, this.airports);
+    }
+    
+    hasSelectionChanged() {
+        const currentState = this.getSelectionStateKey();
+        return this.cache.lastSelectionState !== currentState;
+    }
+    
+    getSelectionStateKey() {
+        const airlines = Array.from(this.selectedAirlines).sort().join(',');
+        const airports = Array.from(this.selectedAirports).sort().join(',');
+        return `${airlines}|${airports}`;
+    }
+    
+    updateSelectionState() {
+        this.cache.lastSelectionState = this.getSelectionStateKey();
+    }
+    
+    transformsEqual(t1, t2) {
+        if (!t1 || !t2) return false;
+        return t1.k === t2.k && t1.x === t2.x && t1.y === t2.y;
     }
     
     getSelectedRoutes() {
@@ -385,12 +472,8 @@ export class AirlineRouteExplorer {
         this.routeRenderer.updateTransform(transform);
         this.airportRenderer.updateTransform(transform);
         
-        // Skip expensive visual property updates during active zoom for better performance
-        // They will be updated when zoom ends
-        if (!isActivelyZooming) {
-            this.routeRenderer.updateOpacityByZoom(zoomLevel, this.selectedAirports);
-            this.airportRenderer.updateRadiusByZoom(zoomLevel);
-        }
+        // During active zoom, only update transforms for smooth interaction
+        // Skip ALL expensive visual property updates - they will be updated when zoom ends
     }
     
     handleZoomEnd(transform, zoomLevel) {
@@ -398,9 +481,8 @@ export class AirlineRouteExplorer {
         this.routeRenderer.updateOpacityByZoom(zoomLevel, this.selectedAirports);
         this.airportRenderer.updateRadiusByZoom(zoomLevel);
         
-        // Recalculate and re-render after zoom/pan ends (debounced)
         if (this.selectedAirlines.size > 0) {
-            this.updateVisualization();
+            this.updateVisualization(false, true);
         }
     }
     

@@ -1,4 +1,3 @@
-// Data processing and filtering logic
 import { CONFIG } from '../config.js';
 
 export class DataProcessor {
@@ -62,10 +61,12 @@ export class DataProcessor {
         }
         
         if (routes.length <= maxRoutes) {
+            // Cache projections even when not filtering - eliminates redundant calculations in renderer
+            this.cacheProjections(routes, projection);
             return routes;
         }
         
-        // Viewport culling
+        // Viewport culling with projection caching
         const [[x0, y0], [x1, y1]] = this.getViewportBounds(transform, width, height);
         const padding = CONFIG.VIEWPORT_PADDING.routes;
         
@@ -75,10 +76,23 @@ export class DataProcessor {
             
             if (!source || !dest) return false;
             
-            const sourceVisible = source[0] >= x0 - padding && source[0] <= x1 + padding &&
-                                 source[1] >= y0 - padding && source[1] <= y1 + padding;
-            const destVisible = dest[0] >= x0 - padding && dest[0] <= x1 + padding &&
-                               dest[1] >= y0 - padding && dest[1] <= y1 + padding;
+            route._projectedSource = source;
+            route._projectedDest = dest;
+            
+            const sourceX = source[0], sourceY = source[1];
+            const destX = dest[0], destY = dest[1];
+            
+            const sourceFarOut = sourceX < x0 - padding && destX < x0 - padding ||
+                                sourceX > x1 + padding && destX > x1 + padding ||
+                                sourceY < y0 - padding && destY < y0 - padding ||
+                                sourceY > y1 + padding && destY > y1 + padding;
+            
+            if (sourceFarOut) return false;
+            
+            const sourceVisible = sourceX >= x0 - padding && sourceX <= x1 + padding &&
+                                 sourceY >= y0 - padding && sourceY <= y1 + padding;
+            const destVisible = destX >= x0 - padding && destX <= x1 + padding &&
+                               destY >= y0 - padding && destY <= y1 + padding;
             
             return sourceVisible || destVisible;
         });
@@ -90,8 +104,16 @@ export class DataProcessor {
         return this.sampleRoutes(visibleRoutes, maxRoutes);
     }
     
+    cacheProjections(routes, projection) {
+        routes.forEach(route => {
+            if (!route._projectedSource || !route._projectedDest) {
+                route._projectedSource = projection([route.sourceCoords.lon, route.sourceCoords.lat]);
+                route._projectedDest = projection([route.destCoords.lon, route.destCoords.lat]);
+            }
+        });
+    }
+    
     filterAirportsByZoom(degrees, airports, zoomLevel, transform, projection, width, height) {
-        // Filter by degree based on zoom
         let minDegree;
         if (zoomLevel < 1) {
             minDegree = CONFIG.MIN_DEGREE_BY_ZOOM.veryZoomedOut;
@@ -103,7 +125,6 @@ export class DataProcessor {
             minDegree = CONFIG.MIN_DEGREE_BY_ZOOM.veryZoomedIn;
         }
         
-        // Filter by viewport
         const [[x0, y0], [x1, y1]] = this.getViewportBounds(transform, width, height);
         const padding = CONFIG.VIEWPORT_PADDING.airports;
         

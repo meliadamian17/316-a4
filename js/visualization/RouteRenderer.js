@@ -14,54 +14,66 @@ export class RouteRenderer {
         this.routesGroup = this.svg.append('g').attr('class', 'routes-layer');
     }
     
-    render(routes, zoomLevel, selectedAirports = new Set()) {
+    render(routes, zoomLevel, selectedAirports = new Set(), isZoomRender = false) {
         this.currentZoom = zoomLevel;
         const displayRoutes = routes;
         
-        // Calculate adaptive opacity
         const baseOpacity = this.calculateOpacity(displayRoutes.length);
         const zoomBonus = Math.min(0.15, zoomLevel * 0.03);
         const finalOpacity = baseOpacity + zoomBonus;
         
-        // Helper function to determine if route is connected to selected airports
-        const isConnected = (d) => {
-            if (selectedAirports.size === 0) return true;
-            return selectedAirports.has(d.source) || selectedAirports.has(d.dest);
+        const hasSelection = selectedAirports.size > 0;
+        
+        const opacityValues = {
+            base: finalOpacity,
+            connected: Math.min(finalOpacity * 2, 0.8),
+            between: Math.min(finalOpacity * 3, 1.0),
+            unconnected: finalOpacity * 0.15
         };
         
-        // Helper function to determine if route is between selected airports
-        const isBetweenSelected = (d) => {
-            if (selectedAirports.size < 2) return false;
-            return selectedAirports.has(d.source) && selectedAirports.has(d.dest);
+        const strokeWidthValues = {
+            base: 1,
+            connected: 1.5,
+            between: 2.5
         };
         
-        // Helper function to get opacity based on selection
         const getRouteOpacity = (d) => {
-            if (selectedAirports.size === 0) return finalOpacity;
-            if (isBetweenSelected(d)) return Math.min(finalOpacity * 3, 1.0); // Highest opacity for routes between selected
-            return isConnected(d) ? Math.min(finalOpacity * 2, 0.8) : finalOpacity * 0.15;
+            if (!hasSelection) return opacityValues.base;
+            
+            const sourceSelected = selectedAirports.has(d.source);
+            const destSelected = selectedAirports.has(d.dest);
+            
+            if (sourceSelected && destSelected) return opacityValues.between;
+            if (sourceSelected || destSelected) return opacityValues.connected;
+            return opacityValues.unconnected;
         };
         
-        // Helper function to get stroke width based on selection
         const getRouteStrokeWidth = (d) => {
-            if (selectedAirports.size === 0) return 1;
-            if (isBetweenSelected(d)) return 2.5; // Thicker lines for routes between selected
-            return isConnected(d) ? 1.5 : 1;
+            if (!hasSelection) return strokeWidthValues.base;
+            
+            const sourceSelected = selectedAirports.has(d.source);
+            const destSelected = selectedAirports.has(d.dest);
+            
+            if (sourceSelected && destSelected) return strokeWidthValues.between;
+            if (sourceSelected || destSelected) return strokeWidthValues.connected;
+            return strokeWidthValues.base;
         };
         
-        // Data join
         const paths = this.routesGroup
             .selectAll('path.route-path')
             .data(displayRoutes, d => `${d.airline}-${d.source}-${d.dest}`);
         
-        // Exit
-        paths.exit()
-            .transition()
-            .duration(CONFIG.ANIMATION.routeExit)
-            .style('opacity', 0)
-            .remove();
+        const exitTransition = paths.exit();
+        if (isZoomRender) {
+            exitTransition.remove();
+        } else {
+            exitTransition
+                .transition()
+                .duration(CONFIG.ANIMATION.routeExit)
+                .style('opacity', 0)
+                .remove();
+        }
         
-        // Enter
         const enter = paths.enter()
             .append('path')
             .attr('class', 'route-path')
@@ -71,20 +83,33 @@ export class RouteRenderer {
             .style('opacity', 0);
         
         // Animate in
-        const duration = Math.max(300, CONFIG.ANIMATION.routeEnter - (zoomLevel * 50));
-        const maxDelay = zoomLevel > 2 ? 100 : 300;
-        
-        enter.transition()
-            .delay((d, i) => Math.min(i * 0.5, maxDelay))
-            .duration(duration)
-            .style('opacity', d => getRouteOpacity(d));
+        if (isZoomRender) {
+            // Skip animations during zoom - instantly show routes
+            enter.style('opacity', d => getRouteOpacity(d));
+        } else {
+            const duration = Math.max(300, CONFIG.ANIMATION.routeEnter - (zoomLevel * 50));
+            const maxDelay = zoomLevel > 2 ? 100 : 300;
+            
+            enter.transition()
+                .delay((d, i) => Math.min(i * 0.5, maxDelay))
+                .duration(duration)
+                .style('opacity', d => getRouteOpacity(d));
+        }
         
         // Update - apply highlighting based on selected airports
-        paths.attr('stroke', d => this.colorUtils.getAirlineColor(d.airline))
-            .attr('stroke-width', d => getRouteStrokeWidth(d))
-            .transition()
-            .duration(300)
-            .style('opacity', d => getRouteOpacity(d));
+        const updateSelection = paths
+            .attr('stroke', d => this.colorUtils.getAirlineColor(d.airline))
+            .attr('stroke-width', d => getRouteStrokeWidth(d));
+        
+        if (isZoomRender) {
+            // Instant updates during zoom
+            updateSelection.style('opacity', d => getRouteOpacity(d));
+        } else {
+            updateSelection
+                .transition()
+                .duration(300)
+                .style('opacity', d => getRouteOpacity(d));
+        }
     }
     
     calculateOpacity(routeCount) {
@@ -96,8 +121,16 @@ export class RouteRenderer {
     }
     
     createArcPath(route) {
-        const source = this.projection([route.sourceCoords.lon, route.sourceCoords.lat]);
-        const dest = this.projection([route.destCoords.lon, route.destCoords.lat]);
+        let source = route._projectedSource;
+        let dest = route._projectedDest;
+        
+        if (!source || !dest) {
+            source = this.projection([route.sourceCoords.lon, route.sourceCoords.lat]);
+            dest = this.projection([route.destCoords.lon, route.destCoords.lat]);
+            
+            route._projectedSource = source;
+            route._projectedDest = dest;
+        }
         
         if (!source || !dest) return '';
         
@@ -125,22 +158,24 @@ export class RouteRenderer {
         const zoomBonus = Math.min(0.15, zoomLevel * 0.03);
         const finalOpacity = baseOpacity + zoomBonus;
         
-        // Helper functions for highlighting
-        const isConnected = (d) => {
-            if (selectedAirports.size === 0) return true;
-            return selectedAirports.has(d.source) || selectedAirports.has(d.dest);
+        const hasSelection = selectedAirports.size > 0;
+        
+        const opacityValues = {
+            base: finalOpacity,
+            connected: Math.min(finalOpacity * 2, 0.8),
+            between: Math.min(finalOpacity * 3, 1.0),
+            unconnected: finalOpacity * 0.15
         };
         
-        const isBetweenSelected = (d) => {
-            if (selectedAirports.size < 2) return false;
-            return selectedAirports.has(d.source) && selectedAirports.has(d.dest);
-        };
-        
-        // Update opacity without transition, respecting selection
         paths.style('opacity', d => {
-            if (selectedAirports.size === 0) return finalOpacity;
-            if (isBetweenSelected(d)) return Math.min(finalOpacity * 3, 1.0);
-            return isConnected(d) ? Math.min(finalOpacity * 2, 0.8) : finalOpacity * 0.15;
+            if (!hasSelection) return opacityValues.base;
+            
+            const sourceSelected = selectedAirports.has(d.source);
+            const destSelected = selectedAirports.has(d.dest);
+            
+            if (sourceSelected && destSelected) return opacityValues.between;
+            if (sourceSelected || destSelected) return opacityValues.connected;
+            return opacityValues.unconnected;
         });
     }
 }
