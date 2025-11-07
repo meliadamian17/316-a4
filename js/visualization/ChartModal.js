@@ -33,9 +33,9 @@ export class ChartModal {
                 background: var(--bg-secondary);
                 border: 1px solid var(--border-color);
                 border-radius: 12px;
-                width: 90%;
-                max-width: 900px;
-                max-height: 85vh;
+                width: 95%;
+                max-width: 1400px;
+                max-height: 90vh;
                 display: flex;
                 flex-direction: column;
                 box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
@@ -84,7 +84,7 @@ export class ChartModal {
                 </div>
                 
                 <!-- Chart Container -->
-                <div class="modal-body" style="
+                <div class="modal-body scrollbar-thin" style="
                     flex: 1;
                     padding: 24px;
                     overflow-y: auto;
@@ -107,31 +107,99 @@ export class ChartModal {
                 ">
                     <div style="
                         display: flex;
-                        gap: 8px;
+                        gap: 12px;
                         align-items: center;
                     ">
-                        <button id="sort-by-count-btn" class="sort-btn active" style="
-                            background: var(--accent-blue);
-                            color: white;
-                            border: none;
-                            border-radius: 6px;
-                            padding: 6px 12px;
-                            font-size: 12px;
-                            font-weight: 500;
-                            cursor: pointer;
-                            transition: opacity 0.2s;
-                        ">Sort by Count</button>
-                        <button id="sort-by-name-btn" class="sort-btn" style="
-                            background: var(--bg-tertiary);
-                            color: var(--text-primary);
-                            border: 1px solid var(--border-color);
-                            border-radius: 6px;
-                            padding: 6px 12px;
-                            font-size: 12px;
-                            font-weight: 500;
-                            cursor: pointer;
-                            transition: all 0.2s;
-                        ">Sort by Name</button>
+                        <!-- Visualization Type Selector -->
+                        <div id="viz-selector" style="
+                            display: flex;
+                            gap: 8px;
+                            padding-right: 12px;
+                            border-right: 1px solid var(--border-color);
+                        ">
+                            <button id="show-bar-chart-btn" class="viz-btn active" style="
+                                background: var(--accent-blue);
+                                color: white;
+                                border: none;
+                                border-radius: 6px;
+                                padding: 6px 14px;
+                                font-size: 12px;
+                                font-weight: 500;
+                                cursor: pointer;
+                                transition: all 0.2s;
+                            ">📊 Bar Chart</button>
+                            <button id="show-heatmap-btn" class="viz-btn" style="
+                                background: var(--bg-tertiary);
+                                color: var(--text-primary);
+                                border: 1px solid var(--border-color);
+                                border-radius: 6px;
+                                padding: 6px 14px;
+                                font-size: 12px;
+                                font-weight: 500;
+                                cursor: pointer;
+                                transition: all 0.2s;
+                            ">🗺️ Heatmap</button>
+                        </div>
+                        
+                        <!-- Bar Chart Controls -->
+                        <div id="bar-chart-controls" style="
+                            display: flex;
+                            gap: 8px;
+                            align-items: center;
+                        ">
+                            <button id="sort-by-count-btn" class="sort-btn active" style="
+                                background: var(--accent-cyan);
+                                color: var(--bg-primary);
+                                border: none;
+                                border-radius: 6px;
+                                padding: 6px 12px;
+                                font-size: 12px;
+                                font-weight: 500;
+                                cursor: pointer;
+                                transition: opacity 0.2s;
+                            ">Sort by Count</button>
+                            <button id="sort-by-name-btn" class="sort-btn" style="
+                                background: var(--bg-tertiary);
+                                color: var(--text-primary);
+                                border: 1px solid var(--border-color);
+                                border-radius: 6px;
+                                padding: 6px 12px;
+                                font-size: 12px;
+                                font-weight: 500;
+                                cursor: pointer;
+                                transition: all 0.2s;
+                            ">Sort by Name</button>
+                        </div>
+                        
+                        <!-- Heatmap Controls -->
+                        <div id="heatmap-controls" style="
+                            display: none;
+                            gap: 8px;
+                            align-items: center;
+                        ">
+                            <button id="view-absolute-btn" class="view-btn active" style="
+                                background: var(--accent-cyan);
+                                color: var(--bg-primary);
+                                border: none;
+                                border-radius: 6px;
+                                padding: 6px 12px;
+                                font-size: 12px;
+                                font-weight: 500;
+                                cursor: pointer;
+                                transition: opacity 0.2s;
+                            ">Absolute</button>
+                            <button id="view-percentage-btn" class="view-btn" style="
+                                background: var(--bg-tertiary);
+                                color: var(--text-primary);
+                                border: 1px solid var(--border-color);
+                                border-radius: 6px;
+                                padding: 6px 12px;
+                                font-size: 12px;
+                                font-weight: 500;
+                                cursor: pointer;
+                                transition: all 0.2s;
+                            ">Percentage</button>
+                        </div>
                     </div>
                     <div style="
                         font-size: 11px;
@@ -221,12 +289,66 @@ export class ChartModal {
         };
     }
     
+    getVizButtons() {
+        return {
+            barChartBtn: this.modal.querySelector('#show-bar-chart-btn'),
+            heatmapBtn: this.modal.querySelector('#show-heatmap-btn')
+        };
+    }
+    
+    getViewButtons() {
+        return {
+            absoluteBtn: this.modal.querySelector('#view-absolute-btn'),
+            percentageBtn: this.modal.querySelector('#view-percentage-btn')
+        };
+    }
+    
+    showBarChartControls() {
+        this.modal.querySelector('#bar-chart-controls').style.display = 'flex';
+        this.modal.querySelector('#heatmap-controls').style.display = 'none';
+    }
+    
+    showHeatmapControls() {
+        this.modal.querySelector('#bar-chart-controls').style.display = 'none';
+        this.modal.querySelector('#heatmap-controls').style.display = 'flex';
+    }
+    
+    setActiveVizButton(type) {
+        const { barChartBtn, heatmapBtn } = this.getVizButtons();
+        
+        if (type === 'bar') {
+            barChartBtn.style.background = 'var(--accent-blue)';
+            barChartBtn.style.color = 'white';
+            barChartBtn.style.border = 'none';
+            barChartBtn.classList.add('active');
+            
+            heatmapBtn.style.background = 'var(--bg-tertiary)';
+            heatmapBtn.style.color = 'var(--text-primary)';
+            heatmapBtn.style.border = '1px solid var(--border-color)';
+            heatmapBtn.classList.remove('active');
+            
+            this.showBarChartControls();
+        } else {
+            heatmapBtn.style.background = 'var(--accent-blue)';
+            heatmapBtn.style.color = 'white';
+            heatmapBtn.style.border = 'none';
+            heatmapBtn.classList.add('active');
+            
+            barChartBtn.style.background = 'var(--bg-tertiary)';
+            barChartBtn.style.color = 'var(--text-primary)';
+            barChartBtn.style.border = '1px solid var(--border-color)';
+            barChartBtn.classList.remove('active');
+            
+            this.showHeatmapControls();
+        }
+    }
+    
     setActiveSortButton(type) {
         const { countBtn, nameBtn } = this.getSortButtons();
         
         if (type === 'count') {
-            countBtn.style.background = 'var(--accent-blue)';
-            countBtn.style.color = 'white';
+            countBtn.style.background = 'var(--accent-cyan)';
+            countBtn.style.color = 'var(--bg-primary)';
             countBtn.style.border = 'none';
             countBtn.classList.add('active');
             
@@ -235,8 +357,8 @@ export class ChartModal {
             nameBtn.style.border = '1px solid var(--border-color)';
             nameBtn.classList.remove('active');
         } else {
-            nameBtn.style.background = 'var(--accent-blue)';
-            nameBtn.style.color = 'white';
+            nameBtn.style.background = 'var(--accent-cyan)';
+            nameBtn.style.color = 'var(--bg-primary)';
             nameBtn.style.border = 'none';
             nameBtn.classList.add('active');
             
@@ -244,6 +366,32 @@ export class ChartModal {
             countBtn.style.color = 'var(--text-primary)';
             countBtn.style.border = '1px solid var(--border-color)';
             countBtn.classList.remove('active');
+        }
+    }
+    
+    setActiveViewButton(type) {
+        const { absoluteBtn, percentageBtn } = this.getViewButtons();
+        
+        if (type === 'absolute') {
+            absoluteBtn.style.background = 'var(--accent-cyan)';
+            absoluteBtn.style.color = 'var(--bg-primary)';
+            absoluteBtn.style.border = 'none';
+            absoluteBtn.classList.add('active');
+            
+            percentageBtn.style.background = 'var(--bg-tertiary)';
+            percentageBtn.style.color = 'var(--text-primary)';
+            percentageBtn.style.border = '1px solid var(--border-color)';
+            percentageBtn.classList.remove('active');
+        } else {
+            percentageBtn.style.background = 'var(--accent-cyan)';
+            percentageBtn.style.color = 'var(--bg-primary)';
+            percentageBtn.style.border = 'none';
+            percentageBtn.classList.add('active');
+            
+            absoluteBtn.style.background = 'var(--bg-tertiary)';
+            absoluteBtn.style.color = 'var(--text-primary)';
+            absoluteBtn.style.border = '1px solid var(--border-color)';
+            absoluteBtn.classList.remove('active');
         }
     }
 }

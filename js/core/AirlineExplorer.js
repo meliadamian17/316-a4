@@ -10,6 +10,7 @@ import { RouteRenderer } from '../visualization/RouteRenderer.js';
 import { AirportRenderer } from '../visualization/AirportRenderer.js';
 import { ChartModal } from '../visualization/ChartModal.js';
 import { BarChartRenderer } from '../visualization/BarChartRenderer.js';
+import { HeatmapRenderer } from '../visualization/HeatmapRenderer.js';
 import { SidebarManager } from '../ui/SidebarManager.js';
 import { TooltipManager } from '../ui/TooltipManager.js';
 import { StatsManager } from '../ui/StatsManager.js';
@@ -58,6 +59,7 @@ export class AirlineRouteExplorer {
         this.exportManager = new ExportManager();
         this.chartModal = new ChartModal();
         this.barChartRenderer = new BarChartRenderer(this.colorUtils);
+        this.heatmapRenderer = new HeatmapRenderer(this.colorUtils);
         
         this.init();
     }
@@ -647,24 +649,87 @@ export class AirlineRouteExplorer {
         // Get chart container
         const container = this.chartModal.getChartContainer();
         
-        // Render chart
-        this.barChartRenderer.render(container, stats.airportStats, 'count');
+        // Current visualization state
+        let currentViz = 'bar';
+        let currentSort = 'count';
+        let currentView = 'absolute';
         
-        // Setup sort buttons
+        // Function to render based on current state
+        const renderVisualization = () => {
+            // Clear previous chart
+            container.innerHTML = '';
+            
+            // Destroy previous tooltips
+            this.barChartRenderer.destroy();
+            this.heatmapRenderer.destroy();
+            
+            if (currentViz === 'bar') {
+                this.barChartRenderer.render(container, stats.airportStats, currentSort);
+            } else {
+                this.heatmapRenderer.render(container, airlineRoutes, currentView);
+            }
+        };
+        
+        // Initial render
+        renderVisualization();
+        
+        // Setup visualization type buttons
+        const { barChartBtn, heatmapBtn } = this.chartModal.getVizButtons();
+        
+        barChartBtn.onclick = () => {
+            currentViz = 'bar';
+            this.chartModal.setActiveVizButton('bar');
+            renderVisualization();
+        };
+        
+        heatmapBtn.onclick = () => {
+            currentViz = 'heatmap';
+            this.chartModal.setActiveVizButton('heatmap');
+            renderVisualization();
+        };
+        
+        // Setup bar chart sort buttons
         const { countBtn, nameBtn } = this.chartModal.getSortButtons();
         
         countBtn.onclick = () => {
+            currentSort = 'count';
             this.chartModal.setActiveSortButton('count');
-            this.barChartRenderer.update(container, 'count');
+            if (currentViz === 'bar') {
+                this.barChartRenderer.render(container, stats.airportStats, currentSort);
+            }
         };
         
         nameBtn.onclick = () => {
+            currentSort = 'name';
             this.chartModal.setActiveSortButton('name');
-            this.barChartRenderer.update(container, 'name');
+            if (currentViz === 'bar') {
+                this.barChartRenderer.render(container, stats.airportStats, currentSort);
+            }
         };
         
-        // Set initial active button
+        // Setup heatmap view buttons
+        const { absoluteBtn, percentageBtn } = this.chartModal.getViewButtons();
+        
+        absoluteBtn.onclick = () => {
+            currentView = 'absolute';
+            this.chartModal.setActiveViewButton('absolute');
+            if (currentViz === 'heatmap') {
+                this.heatmapRenderer.updateViewMode(currentView);
+            }
+        };
+        
+        percentageBtn.onclick = () => {
+            currentView = 'percentage';
+            this.chartModal.setActiveViewButton('percentage');
+            if (currentViz === 'heatmap') {
+                this.heatmapRenderer.updateViewMode(currentView);
+            }
+        };
+        
+        // Set initial active buttons
+        this.chartModal.setActiveVizButton('bar');
         this.chartModal.setActiveSortButton('count');
+        this.chartModal.setActiveViewButton('absolute');
     }
 }
 
