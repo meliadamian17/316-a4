@@ -170,7 +170,7 @@
     
     <!-- Header -->
     <div class="absolute top-0 left-0 right-0 z-10 px-6 py-4" style="background: var(--bg-primary); border-bottom: 1px solid var(--border-color);">
-        <div class="flex items-center gap-3">
+        <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-2">
                 <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
                     <rect width="32" height="32" rx="6" fill="var(--accent-blue)"/>
@@ -181,6 +181,19 @@
                     <h1 class="text-xl font-semibold" style="color: var(--text-primary); letter-spacing: -0.02em;">Airline Route Explorer - Chennai Royals</h1>
                     <p class="text-xs" style="color: var(--text-secondary);">Interactive network visualization by Brandan Burgess, Yatin Malhotra, and Damian Melia</p>
                 </div>
+            </div>
+            <div class="text-right">
+                <a 
+                    href="https://www.kaggle.com/datasets/ahmadrafiee/airports-airlines-planes-and-routes-update-2024?select=routes.csv" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    class="text-xs hover:underline transition-all"
+                    style="color: var(--text-secondary);"
+                    onmouseover="this.style.color='var(--accent-blue)';"
+                    onmouseout="this.style.color='var(--text-secondary)';"
+                >
+                    Dataset Source
+                </a>
             </div>
         </div>
     </div>
