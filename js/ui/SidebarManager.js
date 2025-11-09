@@ -6,6 +6,7 @@ export class SidebarManager {
         this.onClearAll = onClearAll;
         this.onChartClick = onChartClick;
         this.airlines = new Map();
+        this.currentSort = 'routes-desc';
     }
     
     init() {
@@ -17,7 +18,7 @@ export class SidebarManager {
         const container = document.getElementById('airline-list');
         container.innerHTML = '';
         
-        const airlineArray = Array.from(airlines.entries());
+        const airlineArray = this.sortAirlines(Array.from(airlines.entries()));
         const fragment = document.createDocumentFragment();
         
         airlineArray.forEach(([airline, routes]) => {
@@ -100,10 +101,43 @@ export class SidebarManager {
         container.appendChild(fragment);
     }
     
+    sortAirlines(airlineArray) {
+        switch (this.currentSort) {
+            case 'routes-desc':
+                return airlineArray.sort((a, b) => b[1].length - a[1].length);
+            
+            case 'routes-asc':
+                return airlineArray.sort((a, b) => a[1].length - b[1].length);
+            
+            case 'name-asc':
+                return airlineArray.sort((a, b) => {
+                    const nameA = this.dataLoader.getAirlineName(a[0]).toLowerCase();
+                    const nameB = this.dataLoader.getAirlineName(b[0]).toLowerCase();
+                    return nameA.localeCompare(nameB);
+                });
+            
+            case 'name-desc':
+                return airlineArray.sort((a, b) => {
+                    const nameA = this.dataLoader.getAirlineName(a[0]).toLowerCase();
+                    const nameB = this.dataLoader.getAirlineName(b[0]).toLowerCase();
+                    return nameB.localeCompare(nameA);
+                });
+            
+            default:
+                return airlineArray;
+        }
+    }
+    
     setupEventListeners() {
         // Search
         document.getElementById('airline-search').addEventListener('input', (e) => {
             this.filterAirlines(e.target.value);
+        });
+        
+        // Sort
+        document.getElementById('airline-sort').addEventListener('change', (e) => {
+            this.currentSort = e.target.value;
+            this.renderAirlineList(this.airlines);
         });
         
         // Select/Clear All
@@ -157,7 +191,12 @@ export class SidebarManager {
     selectTopAirlines(count) {
         this.selectAllAirlines(false);
         
-        const topAirlines = Array.from(this.airlines.keys()).slice(0, count);
+        // Sort by route count to get actual top airlines regardless of current sort order
+        const topAirlines = Array.from(this.airlines.entries())
+            .sort((a, b) => b[1].length - a[1].length)
+            .slice(0, count)
+            .map(entry => entry[0]);
+        
         topAirlines.forEach(airline => {
             const checkbox = document.getElementById(`airline-${this.escapeId(airline)}`);
             if (checkbox) {

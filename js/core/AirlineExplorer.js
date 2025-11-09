@@ -24,6 +24,10 @@ export class AirlineRouteExplorer {
         this.airports = new Map();
         this.selectedAirports = new Set();  // For multi-airport selection
         
+        // Visibility state
+        this.showSnapshot = true;
+        this.showSelected = true;
+        
         // State
         this.isUpdating = false;
         this.debounceTimer = null;
@@ -141,6 +145,17 @@ export class AirlineRouteExplorer {
         
         document.getElementById('clear-snapshot-btn').addEventListener('click', () => {
             this.clearSnapshot();
+        });
+        
+        // Visibility toggles
+        document.getElementById('toggle-snapshot').addEventListener('change', (e) => {
+            this.showSnapshot = e.target.checked;
+            this.updateVisibility();
+        });
+        
+        document.getElementById('toggle-selected').addEventListener('change', (e) => {
+            this.showSelected = e.target.checked;
+            this.updateVisibility();
         });
     }
     
@@ -499,6 +514,9 @@ export class AirlineRouteExplorer {
         
         this.snapshot = { routes, degrees };
         this.renderSnapshot();
+        
+        const transform = this.zoomManager.getTransform();
+        this.snapshotGroup.attr('transform', transform);
     }
     
     renderSnapshot() {
@@ -506,18 +524,16 @@ export class AirlineRouteExplorer {
         
         this.snapshotGroup.selectAll('*').remove();
         
-        // Ghost routes
         this.snapshotGroup.selectAll('path')
             .data(this.snapshot.routes.slice(0, 3000))
             .enter()
             .append('path')
             .attr('d', d => this.routeRenderer.createArcPath(d))
-            .attr('stroke', '#666666')
+            .attr('stroke', '#cccccc') 
             .attr('fill', 'none')
-            .attr('stroke-width', 1)
+            .attr('stroke-width', 0.5) 
             .style('opacity', 0.12);
         
-        // Ghost airports
         const airports = Array.from(this.snapshot.degrees.entries()).map(([code, degree]) => ({
             code, degree, ...this.airports.get(code)
         }));
@@ -529,7 +545,7 @@ export class AirlineRouteExplorer {
             .attr('cx', d => this.projection([d.lon, d.lat])[0])
             .attr('cy', d => this.projection([d.lon, d.lat])[1])
             .attr('r', d => this.airportRenderer.getRadius(d.degree))
-            .attr('fill', '#666666')
+            .attr('fill', '#cccccc') 
             .style('opacity', 0.12);
     }
     
@@ -540,6 +556,31 @@ export class AirlineRouteExplorer {
             .duration(300)
             .style('opacity', 0)
             .remove();
+    }
+    
+    updateVisibility() {
+        if (this.snapshot) {
+            if (this.showSnapshot) {
+                this.snapshotGroup.style('display', 'block');
+                this.snapshotGroup.selectAll('*')
+                    .transition()
+                    .duration(300)
+                    .style('opacity', d => d.degree ? 0.12 : 0.12);
+            } else {
+                this.snapshotGroup.selectAll('*')
+                    .transition()
+                    .duration(300)
+                    .style('opacity', 0)
+                    .on('end', () => {
+                        if (!this.showSnapshot) {
+                            this.snapshotGroup.style('display', 'none');
+                        }
+                    });
+            }
+        }
+        
+        this.routeRenderer.setVisibility(this.showSelected);
+        this.airportRenderer.setVisibility(this.showSelected);
     }
     
     handleResize() {
@@ -561,16 +602,16 @@ export class AirlineRouteExplorer {
     }
     
     exportSelectedData(format) {
-        if (this.selectedAirlines.size === 0) {
-            this.exportManager.showNotification('Please select at least one airline to export', 'error');
+        if (this.selectedAirlines.size === 0 && !this.snapshot) {
+            this.exportManager.showNotification('Please select at least one airline or save a snapshot to export', 'error');
             return;
         }
         
         const selectedRoutes = this.getSelectedRoutes();
-        const airportDegrees = this.dataProcessor.calculateAirportDegrees(selectedRoutes);
+        const selectedAirportDegrees = this.dataProcessor.calculateAirportDegrees(selectedRoutes);
         
-        // Format routes data
-        const routesData = selectedRoutes.map(route => ({
+        const selectedRoutesData = selectedRoutes.map(route => ({
+            data_source: 'selected',
             airline: route.airline,
             source_airport: route.source,
             destination_airport: route.dest,
@@ -580,19 +621,46 @@ export class AirlineRouteExplorer {
             destination_longitude: route.destCoords.lon
         }));
         
-        // Format airports data
-        const airportsData = Array.from(airportDegrees.entries()).map(([code, degree]) => {
+        let snapshotRoutesData = [];
+        let snapshotAirportDegrees = new Map();
+        if (this.snapshot) {
+            snapshotRoutesData = this.snapshot.routes.map(route => ({
+                data_source: 'snapshot',
+                airline: route.airline,
+                source_airport: route.source,
+                destination_airport: route.dest,
+                source_latitude: route.sourceCoords.lat,
+                source_longitude: route.sourceCoords.lon,
+                destination_latitude: route.destCoords.lat,
+                destination_longitude: route.destCoords.lon
+            }));
+            snapshotAirportDegrees = this.snapshot.degrees;
+        }
+        
+        const allRoutesData = [...selectedRoutesData, ...snapshotRoutesData];
+        
+        const allAirportCodes = new Set([
+            ...selectedAirportDegrees.keys(),
+            ...snapshotAirportDegrees.keys()
+        ]);
+        
+        const airportsData = Array.from(allAirportCodes).map(code => {
             const airport = this.airports.get(code);
+            const selectedDegree = selectedAirportDegrees.get(code) || 0;
+            const snapshotDegree = snapshotAirportDegrees.get(code) || 0;
+            
             return {
                 airport_code: code,
                 latitude: airport ? airport.lat : null,
                 longitude: airport ? airport.lon : null,
-                connection_degree: degree,
-                is_selected: this.selectedAirports.has(code)
+                selected_connection_degree: selectedDegree,
+                snapshot_connection_degree: snapshotDegree,
+                in_selected: selectedDegree > 0,
+                in_snapshot: snapshotDegree > 0,
+                is_user_selected: this.selectedAirports.has(code)
             };
         });
         
-        // Format airlines data
         const airlinesData = Array.from(this.selectedAirlines).map(airline => {
             const routes = this.airlines.get(airline) || [];
             return {
@@ -602,18 +670,20 @@ export class AirlineRouteExplorer {
             };
         });
         
-        // Create export data structure
         const exportData = {
             metadata: {
                 export_date: new Date().toISOString(),
+                has_snapshot: this.snapshot !== null,
                 selected_airlines_count: this.selectedAirlines.size,
                 selected_airports_count: this.selectedAirports.size,
-                total_routes: selectedRoutes.length,
+                selected_routes_count: selectedRoutes.length,
+                snapshot_routes_count: this.snapshot ? this.snapshot.routes.length : 0,
+                total_routes: allRoutesData.length,
                 total_airports: airportsData.length
             },
             airlines: airlinesData,
             airports: airportsData,
-            routes: routesData
+            routes: allRoutesData
         };
         
         // Generate filename with timestamp
@@ -621,11 +691,27 @@ export class AirlineRouteExplorer {
         const filename = `airline_export_${timestamp}`;
         
         if (format === 'csv') {
-            // Export routes as CSV (most common use case)
-            this.exportManager.exportToCSV(routesData, `${filename}_routes`);
+            this.exportManager.exportToCSV(allRoutesData, `${filename}_routes`);
+            
+            if (this.snapshot && snapshotRoutesData.length > 0) {
+                setTimeout(() => {
+                    this.exportManager.showNotification(
+                        `Included ${selectedRoutesData.length} selected + ${snapshotRoutesData.length} snapshot routes`, 
+                        'success'
+                    );
+                }, 500);
+            }
         } else if (format === 'json') {
-            // Export all data as JSON
             this.exportManager.exportToJSON(exportData, filename);
+            
+            if (this.snapshot && snapshotRoutesData.length > 0) {
+                setTimeout(() => {
+                    this.exportManager.showNotification(
+                        `Included ${selectedRoutesData.length} selected + ${snapshotRoutesData.length} snapshot routes`, 
+                        'success'
+                    );
+                }, 500);
+            }
         }
     }
     

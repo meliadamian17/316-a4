@@ -32,10 +32,8 @@ export class AirportRenderer {
             .selectAll('circle.airport-node')
             .data(activeAirports, d => d.code);
         
-        // Exit
         const exitTransition = circles.exit();
         if (isZoomRender) {
-            // Skip animations during zoom for instant response
             exitTransition.remove();
         } else {
             exitTransition
@@ -46,7 +44,6 @@ export class AirportRenderer {
                 .remove();
         }
         
-        // Enter
         const enter = circles.enter()
             .append('circle')
             .attr('class', 'airport-node')
@@ -56,14 +53,12 @@ export class AirportRenderer {
             .attr('fill', d => this.colorUtils.getNodeColor(d.degree))
             .style('opacity', 0);
         
-        // Tooltips
         if (tooltipCallbacks) {
             enter.on('mouseover', tooltipCallbacks.show)
                 .on('mouseout', tooltipCallbacks.hide)
                 .on('mousemove', tooltipCallbacks.move);
         }
         
-        // Click handler for airport selection
         if (clickCallback) {
             enter.on('click', function(event, d) {
                 event.stopPropagation();
@@ -71,9 +66,7 @@ export class AirportRenderer {
             });
         }
         
-        // Animate in
         if (isZoomRender) {
-            // Skip animations during zoom - instantly show airports
             enter
                 .attr('r', d => this.getRadius(d.degree))
                 .style('opacity', 0.85);
@@ -85,10 +78,8 @@ export class AirportRenderer {
                 .style('opacity', 0.85);
         }
         
-        // Update - apply visual feedback for selected airport
         const allCircles = enter.merge(circles);
         
-        // Update click handler for existing circles
         if (clickCallback) {
             allCircles.on('click', function(event, d) {
                 event.stopPropagation();
@@ -105,12 +96,10 @@ export class AirportRenderer {
         const getStrokeWidth = (d) => selectedAirports.has(d.code) ? 3 : 1;
         const getStroke = (d) => selectedAirports.has(d.code) ? '#50e3c2' : 'var(--node-stroke)';
         
-        // Apply selection styling
         const updateSelection = allCircles
             .classed('selected-airport', d => selectedAirports.has(d.code));
         
         if (isZoomRender) {
-            // Instant updates during zoom
             updateSelection
                 .attr('r', d => this.getRadius(d.degree))
                 .attr('fill', d => this.colorUtils.getNodeColor(d.degree))
@@ -147,6 +136,35 @@ export class AirportRenderer {
         
         // Update radius without transition for smooth interaction
         circles.attr('r', d => this.getRadius(d.degree));
+    }
+    
+    setVisibility(visible) {
+        const circles = this.airportsGroup.selectAll('circle');
+        
+        if (visible) {
+            this.airportsGroup.style('display', 'block');
+            circles.transition()
+                .duration(300)
+                .style('opacity', function() {
+                    const currentOpacity = d3.select(this).attr('data-target-opacity');
+                    return currentOpacity || 0.85;
+                });
+        } else {
+            circles.each(function() {
+                const current = d3.select(this).style('opacity');
+                d3.select(this).attr('data-target-opacity', current);
+            });
+            
+            const group = this.airportsGroup;
+            circles.transition()
+                .duration(300)
+                .style('opacity', 0)
+                .on('end', function(d, i, nodes) {
+                    if (i === nodes.length - 1) {
+                        group.style('display', 'none');
+                    }
+                });
+        }
     }
 }
 

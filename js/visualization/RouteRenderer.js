@@ -178,5 +178,34 @@ export class RouteRenderer {
             return opacityValues.unconnected;
         });
     }
+    
+    setVisibility(visible) {
+        const paths = this.routesGroup.selectAll('path');
+        
+        if (visible) {
+            this.routesGroup.style('display', 'block');
+            paths.transition()
+                .duration(300)
+                .style('opacity', function() {
+                    const currentOpacity = d3.select(this).attr('data-target-opacity');
+                    return currentOpacity || d3.select(this).style('opacity');
+                });
+        } else {
+            paths.each(function() {
+                const current = d3.select(this).style('opacity');
+                d3.select(this).attr('data-target-opacity', current);
+            });
+            
+            const group = this.routesGroup;
+            paths.transition()
+                .duration(300)
+                .style('opacity', 0)
+                .on('end', function(d, i, nodes) {
+                    if (i === nodes.length - 1) {
+                        group.style('display', 'none');
+                    }
+                });
+        }
+    }
 }
 
