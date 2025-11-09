@@ -150,28 +150,36 @@ export class HeatmapRenderer {
         
         // Calculate dimensions
         const containerWidth = container.offsetWidth;
-        const containerHeight = Math.max(regions.length * 60 + this.margin.top + this.margin.bottom, 500);
-        const width = containerWidth - this.margin.left - this.margin.right;
-        const height = containerHeight - this.margin.top - this.margin.bottom;
         
-        // Create wrapper div with left margin
+        const maxCellSize = 80;
+        const minCellSize = 50;
+        const cellSize = Math.max(minCellSize, Math.min(maxCellSize, 600 / regions.length));
+        
+        const matrixSize = regions.length * cellSize;
+        const legendWidth = 180;
+        const legendGap = 40;
+        
+        const svgWidth = this.margin.left + matrixSize + legendGap + legendWidth + this.margin.right;
+        const containerHeight = Math.max(matrixSize + this.margin.top + this.margin.bottom, 500);
+        
+        // Create wrapper div centered with flexbox
         const wrapper = d3.select(container)
             .append('div')
-            .style('margin-left', '150px')
-            .style('width', '100%');
+            .style('display', 'flex')
+            .style('justify-content', 'center')
+            .style('align-items', 'flex-start')
+            .style('width', '100%')
+            .style('height', '100%');
         
-        // Create SVG inside wrapper
+        // Create SVG inside wrapper with calculated width
         this.svg = wrapper
             .append('svg')
-            .attr('width', containerWidth)
+            .attr('width', svgWidth)
             .attr('height', containerHeight)
             .style('background', 'transparent');
         
         const g = this.svg.append('g')
             .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
-        
-        // Create scales
-        const cellSize = Math.min(width / regions.length, height / regions.length);
         
         // Add background container around the matrix
         const matrixWidth = regions.length * cellSize;
@@ -190,12 +198,12 @@ export class HeatmapRenderer {
         
         const xScale = d3.scaleBand()
             .domain(regions)
-            .range([0, regions.length * cellSize])
+            .range([0, matrixSize])
             .padding(0.05);
         
         const yScale = d3.scaleBand()
             .domain(regions)
-            .range([0, regions.length * cellSize])
+            .range([0, matrixSize])
             .padding(0.05);
         
         // Color scale - using single color (blue) with varying intensity
@@ -341,7 +349,7 @@ export class HeatmapRenderer {
         
         // Add axis labels
         g.append('text')
-            .attr('x', regions.length * cellSize / 2)
+            .attr('x', matrixSize / 2)
             .attr('y', -50)
             .attr('text-anchor', 'middle')
             .style('fill', 'var(--text-primary)')
@@ -350,10 +358,10 @@ export class HeatmapRenderer {
             .text('Destination Region');
         
         g.append('text')
-            .attr('x', -regions.length * cellSize / 2)
+            .attr('x', -matrixSize / 2)
             .attr('y', -45)
             .attr('text-anchor', 'middle')
-            .attr('transform', `rotate(-90, -45, ${regions.length * cellSize / 2})`)
+            .attr('transform', `rotate(-90, -45, ${matrixSize / 2})`)
             .style('fill', 'var(--text-primary)')
             .style('font-size', '14px')
             .style('font-weight', '600')
@@ -406,17 +414,15 @@ export class HeatmapRenderer {
         });
         
         // Add legends (intensity and region abbreviations)
-        this.addIntensityLegend(g, colorScale, maxValue, regions.length * cellSize, containerWidth, this.margin);
-        this.addRegionLegend(g, regions, abbreviations, regions.length * cellSize, containerWidth, this.margin);
+        this.addIntensityLegend(g, colorScale, maxValue, matrixSize, legendWidth, legendGap);
+        this.addRegionLegend(g, regions, abbreviations, matrixSize, legendWidth, legendGap);
     }
     
-    addIntensityLegend(g, colorScale, maxValue, chartWidth, containerWidth, margin) {
-        const legendWidth = 180;
+    addIntensityLegend(g, colorScale, maxValue, matrixSize, legendWidth, legendGap) {
         const legendHeight = 20;
         
-        // Position legend on right but ensure it stays within container
-        const maxLegendX = containerWidth - margin.right - legendWidth - 20;
-        const legendX = Math.min(chartWidth + 40, maxLegendX);
+        // Position legend to the right of the matrix
+        const legendX = matrixSize + legendGap;
         const legendY = 20;
         
         // Legend group
@@ -482,11 +488,9 @@ export class HeatmapRenderer {
             .text('Route Intensity');
     }
     
-    addRegionLegend(g, regions, abbreviations, chartWidth, containerWidth, margin) {
-        // Position legend relative to chart, ensuring it stays within bounds
-        const legendWidth = 180;
-        const maxLegendX = containerWidth - margin.right - legendWidth - 20;
-        const legendX = Math.min(chartWidth + 40, maxLegendX);
+    addRegionLegend(g, regions, abbreviations, matrixSize, legendWidth, legendGap) {
+        // Position legend to the right of the matrix, below the intensity legend
+        const legendX = matrixSize + legendGap;
         const legendY = 100;
         const lineHeight = 20;
         
